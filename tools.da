@@ -1,0 +1,65 @@
+import igraph
+import random
+import enum
+
+def genGraphEdges(n):
+    numEdges = random.randint(n, 4*n)
+    gr = igraph.Graph(directed=False)
+    gr = gr.Erdos_Renyi(n=n, m=numEdges)
+    nodes = gr.vs.indices
+    #for k in nodes: #make sure that all nodes are connected
+    #    if gr.degree(k)==0: gr.add_edges((k, 0))
+    tuple_list=[]
+    for e in gr.es:
+        tuple_list.append(e.tuple)
+    return tuple_list
+    
+
+class NodeState(enum.Enum):
+    #possible states of each node
+    sleep = 1
+    find = 2 #node is searching the fragment's lowest weight outgoing edge
+    found = 3
+    finished = 4
+
+class EdgeState(enum.Enum):
+    branch = 1  #edge is in the MST
+    reject = 2 #excluded from MST
+    basic = 3 #still not used
+
+class Observer(process):
+    def setup(nodes, edges, weights, nodesDic):
+        self.receivedAnswers = 0
+        self.gr = igraph.Graph(directed=False)
+        self.gr.add_vertices(range(len(nodes)))
+        self.gr.add_edges(edges)
+        self.gr.es["label"] = weights
+        self.gr.vs["label"] = range(len(nodes))
+        self.completing = False
+        layout = self.gr.layout("kk")
+        igraph.plot(self.gr, layout = layout)
+        self.graphWeights = []
+
+    def run():
+        layout = self.gr.layout("kk")
+        self.gr.delete_edges(None)
+        self.gr.es["label"]= []
+        await(self.receivedAnswers == len(self.nodes))
+        self.gr.es["label"] = self.graphWeights
+        igraph.plot(self.gr, layout = layout)
+    
+    def receive(msg=('complete'), from_=q):
+        if not self.completing:
+            send('obsQuery', to=nodes)
+            self.completing = True
+
+    def receive(msg=('answer', stach, locWeights), from_=s):
+        output("Observer has received answer from ", nodesDic[s])
+        sourceNum = nodesDic[s]
+        for dest, st in stach.items():
+            destNum = nodesDic[dest]
+            if st == EdgeState.branch and not self.gr.are_connected(sourceNum, destNum):
+                self.gr.add_edges([(sourceNum, destNum)])
+                self.graphWeights.append(locWeights[dest])
+        self.receivedAnswers += 1
+             
